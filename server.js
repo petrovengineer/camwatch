@@ -17,8 +17,66 @@ c.on('ready', function() {
         })
     });
 });
+//==============================================================================
 
-c.connect({host:"smart-spb.ru",user:"ftpuser", password:"nwe97wzuUbFt!"});
+const getPromise = function(func, args){
+    return new Promise((done, fail)=>{
+        func(done, fail, args);
+    })
+}
+
+const getDates = (done, fail)=>{
+    var dates = [];
+    c.list(pathToDates,function(err, list) {
+        if (err) fail(err);
+        list.map((item)=>{
+            if(item.type==='d'){dates.push(item.name);};
+        })
+        done(dates);
+    });
+}
+
+const getHours = (done, fail, {pathToHours})=>{
+    var hours = [];
+    c.list(pathToHours, function(err, list) {
+        if (err) fail(err);
+        list.map((item)=>{
+            if(item.type==='d'){hours.push(item.name);};
+        })
+        done(hours);
+    });
+}
+
+const getMinutes = (done, fail, {pathToMinutes})=>{
+    var minutes = [];
+    c.list(pathToMinutes, function(err, list) {
+        if (err) fail(err);
+        list.map((item)=>{
+            if(item.type==='d'){minutes.push(item.name);};
+        })
+        done(minutes);
+    });
+}
+var glob = {}
+const getCats = async function(){
+    var dates = await getPromise(getDates);
+    dates.forEach(async (date, di)=>{
+        glob[date] = [];
+        var pathToHours = pathToDates+'/'+date+pathToImgs;
+        var hours = await getPromise(getHours, {pathToHours});
+        hours.forEach(async (hour, hi)=>{
+            var pathToMinutes = pathToDates+'/'+date+pathToImgs+'/'+hour;
+            var minutes = await getPromise(getMinutes, {pathToMinutes});
+            hour={[hour]:minutes};
+            glob[date].push(hour);
+            if(di+1==dates.length && hi+1==hours.length)console.log("DONE");
+        })
+    })
+}()
+//=============================================================================
+
+
+c.connect({host:"smart-spb.ru",user:"test", password:"nwe97wzuUbTe!"});
 
 app.get('/', function (req, res) {
     var links = [];
