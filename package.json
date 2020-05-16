@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.17.1",
-    "ftp": "^0.3.10"
+    "ftp": "^0.3.10",
+    "sharp": "^0.25.2"
   }
 }

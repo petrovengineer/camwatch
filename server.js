@@ -17,8 +17,8 @@ c.on('ready', function() {
         })
     });
 });
-//==============================================================================
 
+//==============================================================================
 const getPromise = function(func, args){
     return new Promise((done, fail)=>{
         func(done, fail, args);
@@ -58,7 +58,7 @@ const getMinutes = (done, fail, {pathToMinutes})=>{
     });
 }
 var glob = {}
-const getCats = async function(){
+const getCats = async function(req, res){
     var dates = await getPromise(getDates);
     dates.forEach(async (date, di)=>{
         glob[date] = [];
@@ -69,10 +69,12 @@ const getCats = async function(){
             var minutes = await getPromise(getMinutes, {pathToMinutes});
             hour={[hour]:minutes};
             glob[date].push(hour);
-            if(di+1==dates.length && hi+1==hours.length)console.log("DONE");
+            if(di+1==dates.length && hi+1==hours.length)res.send(glob);
         })
     })
-}()
+}
+
+app.get('/cats', getCats);
 //=============================================================================
 
 
@@ -156,11 +158,13 @@ app.get('/pictures', function (req, res) {
         links.push('<div>Date:'+date+' Hour: '+hour+' Minute: '+minute+'</div>');
         links.push('<a href="/minutes?hour='+hour+'&date='+date+'">Up</a>');
         pictures.map((picture)=>{
-            links.push('<a href="/showpic?hour='+hour+'&date='+date+'&minute='+minute+'&picture='+picture+'"><img height="300px" src="/showpic?hour='+hour+'&date='+date+'&minute='+minute+'&picture='+picture+'"/></a>');
+            links.push('<a href="/showpic?hour='+hour+'&date='+date+'&minute='+minute+'&picture='+picture+'"><img height="300px" src="/showpicmin?hour='+hour+'&date='+date+'&minute='+minute+'&picture='+picture+'"/></a>');
         })
         res.send(links.join("<br>"));
     });
 })
+
+const sharp = require('sharp');
 
 app.get('/showpic', function (req, res) {
     var hour = req.query.hour;
@@ -170,8 +174,26 @@ app.get('/showpic', function (req, res) {
     var pathToPicture = pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute+'/'+picture;
     c.get(pathToPicture, function(err, stream) {
         if (err) throw err;
-        stream.once('close', function() { console.log("Download from FTP finish.") });
         stream.pipe(res);
+        stream.on('close', function() { console.log("Download from FTP finish.") });
+      });
+})
+
+app.get('/showpicmin', function (req, res) {
+    var hour = req.query.hour;
+    var minute = req.query.minute;
+    var date = req.query.date;
+    var picture = req.query.picture;
+    var pathToPicture = pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute+'/'+picture;
+    let transform = sharp()
+                    .resize({ width: 320, height: 240 })
+                    .on('info', function(fileInfo) {
+                        console.log("Resizing done, file not saved");
+                    });
+    c.get(pathToPicture, function(err, stream) {
+        if (err) throw err;
+        stream.pipe(transform).pipe(res);
+        stream.on('close', function() { console.log("Download from FTP finish.") });
       });
 })
 
