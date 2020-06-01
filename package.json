@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.17.1",
     "fluent-ffmpeg": "^2.1.2",
     "ftp": "^0.3.10",

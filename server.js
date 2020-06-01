@@ -1,6 +1,16 @@
 const express = require('express')
 const app = express()
+// var cors = require('cors')
+
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "http://localhost:3000"); // update to match the domain you will make the request from
+    res.header("Access-Control-Allow-Credentials", true);
+    res.header("Access-Control-Allow-Headers", "Cache-Control, Origin, X-Requested-With, Content-Type, Accept");
+    next();
+  });
+
 app.use(express.static('public'));
+
 
 var Client = require('ftp');
 
@@ -49,41 +59,52 @@ const getMinutes = (done, fail, {pathToMinutes, c})=>{
     });
 }
 
+const getPictures = (done, fail, {pathToPictures, c})=>{
+    var pictures = [];
+    c.list(pathToPictures, function(err, list) {
+        if (err) fail(err);
+        list.map((item)=>{
+            if(item.type!=='d'){pictures.push(item.name);};
+        })
+        done(pictures);
+    });
+}
+
 const ftpReady = (done, fail, {c})=>{
     c.on('ready', function() {
-        console.log("Ready")
+        console.log("Connected to FTP...")
         done();
     });
 }
 
 const getCats = async function(req, res){
-    var glob = {}
+    var events = [];
     var c = new Client();
     c.connect({host:"smart-spb.ru",user:"test", password:"nwe97wzuUbTe!"});
-    const used = process.memoryUsage().heapUsed / 1024 / 1024;
-    console.log(`Start ${Math.round(used * 100) / 100} MB`);
-    await getPromise(ftpReady, {c})
+    await getPromise(ftpReady, {c});
     var dates = await getPromise(getDates, {c});
     dates.forEach(async (date, di)=>{
-        glob[date] = [];
         var pathToHours = pathToDates+'/'+date+pathToImgs;
         var hours = await getPromise(getHours, {pathToHours, c});
         hours.forEach(async (hour, hi)=>{
             var pathToMinutes = pathToDates+'/'+date+pathToImgs+'/'+hour;
             var minutes = await getPromise(getMinutes, {pathToMinutes, c});
-            hour={[hour]:minutes};
-            glob[date].push(hour);
-            if(di+1==dates.length && hi+1==hours.length){
-                res.send(glob);
-                c.end();
-                const used = process.memoryUsage().heapUsed / 1024 / 1024;
-                console.log(`Start ${Math.round(used * 100) / 100} MB`);
-            }
+            minutes.forEach(async (minute, mi)=>{
+                var pathToPictures = pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute;
+                var pictures = await getPromise(getPictures, {pathToPictures, c});
+                console.log("Pictures:", pictures);
+                events.push({date, hour, minute, pictures});
+                if(di+1==dates.length && hi+1==hours.length && mi+1==minutes.length){
+                    c.end();
+                    console.log("Disconnected from FTP.")
+                    res.send(events);
+                }
+            })
         })
     })
 }
 
-app.get('/cats', getCats);
+app.get('/cats',  getCats);
 //=============================================================================
 
 
@@ -197,7 +218,6 @@ app.get('/showpic', function (req, res) {
 })
 
 var ffmpeg = require('fluent-ffmpeg');
-const fs = require('fs');
 
 app.get('/showvideo', function (req, res) {
     console.log("SHOWVIDEO")
