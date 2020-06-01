@@ -14,10 +14,41 @@ app.use(express.static('public'));
 
 var Client = require('ftp');
 
+const rootPath = '/home/vftp'
 const pathToDates = "/cam/2F02CE5PAA00391";
 const pathToImgs = "/001/jpg"
 const pathToVideos = "/001/dav"
 var dates = [];
+
+//============================================================================
+const fs = require('fs');
+
+const readFolder = (done, fail, {folder, filetype=false})=>{
+    fs.readdir(rootPath+folder, {withFileTypes: true}, (err, files) => {
+        if(err){fail(err)};
+        done(files.filter((file)=>filetype?!file.isDirectory():file.isDirectory()));
+    });
+}
+
+app.get('/getcats', async (req, res)=>{
+    var events = [];
+    var dates = await getPromise(readFolder, {folder: pathToDates});
+    dates.forEach(async ({name:date}, di)=>{
+        var hours = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs});
+        hours.forEach(async({name:hour}, hi)=>{
+            var minutes = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour})
+            minutes.forEach(async({name: minute}, mi)=>{
+                var picsFull = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute, filetype:true})
+                var pics = [];
+                picsFull.forEach(({name:pic})=>pics.push(pic));
+                events.push({date,hour, minute, pics});
+                if(di+1==dates.length && hi+1==hours.length && mi+1==minutes.length){
+                    res.send(events);
+                }
+            })
+        })
+    })
+})
 
 //==============================================================================
 const getPromise = function(func, args){
