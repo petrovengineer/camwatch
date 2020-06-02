@@ -36,12 +36,17 @@ app.get('/getcats', async (req, res)=>{
     dates.forEach(async ({name:date}, di)=>{
         var hours = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs});
         hours.forEach(async({name:hour}, hi)=>{
-            var minutes = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour})
+            var minutes = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour});
             minutes.forEach(async({name: minute}, mi)=>{
+                var videos = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToVideos+'/'+hour, filetype: true});
+                var v = videos.filter((video)=>(video.name.indexOf(".dav")!==-1&&
+                    ((video.name[3]==minute[0]&&video.name[4]==minute[1])||
+                    (video.name[12]==minute[0]&&video.name[13]==minute[1])))).map(({name})=>name);
+                // console.log("Date:",date,"Hour:",hour,"Minute:",minute,"Videos:", v);
                 var picsFull = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute, filetype:true})
                 var pics = [];
                 picsFull.forEach(({name:pic})=>pics.push(pic));
-                events.push({date,hour, minute, pics});
+                events.push({date, hour, minute, pics, videos: v});
                 if(di+1==dates.length && hi+1==hours.length && mi+1==minutes.length){
                     res.send(events);
                 }
@@ -277,7 +282,7 @@ app.get('/showvideo', function (req, res) {
             // .writeToStream(res, {end:true})
             // .run();
         // stream.pipe(res);
-        stream.on('close', function() { console.log("Download from FTP finish."); c.end();});
+        stream.on('close', function() { console.log("Download from FTP finish."); cl.end();});
       });
 })
 
@@ -287,6 +292,8 @@ app.get('/showpicmin', function (req, res) {
     var date = req.query.date;
     var picture = req.query.picture;
     var pathToPicture = pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute+'/'+picture;
+    var c = new Client();
+    c.connect({host:"smart-spb.ru",user:"test", password:"nwe97wzuUbTe!"});
     let transform = sharp()
                     .resize({ width: 320, height: 240 })
                     .on('info', function(fileInfo) {
@@ -295,7 +302,7 @@ app.get('/showpicmin', function (req, res) {
     c.get(pathToPicture, function(err, stream) {
         if (err) throw err;
         stream.pipe(transform).pipe(res);
-        stream.on('close', function() { console.log("Download from FTP finish.") });
+        stream.on('close', function() { console.log("Download from FTP finish."); c.end(); });
       });
 })
 
