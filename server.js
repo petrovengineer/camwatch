@@ -1,6 +1,7 @@
 const express = require('express')
 const app = express()
 const sharp = require('sharp');
+const ffmpeg = require('fluent-ffmpeg');
 require('dotenv').config()
 
 app.use(function(req, res, next) {
@@ -23,12 +24,8 @@ const pathToDates = "/cam/2F02CE5PAA00391";
 const pathToImgs = "/001/jpg"
 const pathToVideos = "/001/dav"
 
-const ffmpeg = require('fluent-ffmpeg');
-
 app.get('/showvideostatic', function (req, res) {
-    let hour = req.query.hour;
-    let date = req.query.date;
-    let video = req.query.video;
+    let {hour, date, video} = req.query;
     let pathToV = rootPath+'/'+pathToDates+'/'+date+pathToVideos+'/'+hour+'/'+video;
     res.setHeader('Content-Type', 'video/webm');
     let readStream = fs.createReadStream(pathToV);
@@ -74,25 +71,26 @@ const readFolder = (done, fail, {folder, filetype=false})=>{
 app.get('/getcats', async (req, res)=>{
     let events = [];
     let dates = await getPromise(readFolder, {folder: pathToDates});
-    dates.forEach(async ({name:date}, di)=>{
-        var hours = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs});
-        hours.forEach(async({name:hour}, hi)=>{
-            var minutes = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour});
-            minutes.forEach(async({name: minute}, mi)=>{
-                var videos = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToVideos+'/'+hour, filetype: true});
-                var v = videos.filter((video)=>(video.name.indexOf(".dav")!==-1&&
+    for (let i=0; i<dates.length; i++){
+        let {name:date} = dates[i];
+        let hours = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs});
+        for (let i=0; i<hours.length; i++){
+            let {name:hour} = hours[i];
+            let minutes = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour});
+            for (let i=0; i<minutes.length; i++){
+                let {name: minute} = minutes[i];
+                let videos = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToVideos+'/'+hour, filetype: true});
+                let v = videos.filter((video)=>(video.name.indexOf(".dav")!==-1&&
                     ((video.name[3]==minute[0]&&video.name[4]==minute[1])||
                     (video.name[12]==minute[0]&&video.name[13]==minute[1])))).map(({name})=>name);
-                var picsFull = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute, filetype:true})
-                var pics = [];
+                let picsFull = await getPromise(readFolder, {folder: pathToDates+'/'+date+pathToImgs+'/'+hour+'/'+minute, filetype:true})
+                let pics = [];
                 picsFull.forEach(({name:pic})=>pics.push(pic));
                 events.push({date, hour, minute, pics, videos: v});
-                if(di+1==dates.length && hi+1==hours.length && mi+1==minutes.length){
-                    res.send(events);
-                }
-            })
-        })
-    })
+            }
+        }
+    }
+    res.send(events);
 })
 
 //==============================================================================
@@ -101,7 +99,6 @@ app.listen(4000)
 
 process.on('exit', (code) => {
     console.log(`About to exit with code: ${code}`);
-    c.end();
   });
 
 process.on('SIGINT', function() {
